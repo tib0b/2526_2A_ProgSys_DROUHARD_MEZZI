@@ -6,17 +6,22 @@
 #include <string.h>
 #include <time.h>
 #include <wait.h>
+#include <curses.h>
+
+#define MAX_INPUT_SIZE 64
+
 
 int main(void) {
-
-    char input[20];
+    int status = -1;
+    char input[MAX_INPUT_SIZE];
     printf("Welcome to ENSEA Shell. \n");
     printf("To exit, type 'exit'.\n");
-    while(1) {
-        printf("enseash %% ");
-        fflush(stdout);
-        fgets(input, 20, stdin);
-        if (strcmp(input, "exit\n") == 0) {
+    {printf("enseash %% ");}
+    fflush(stdout);
+
+    while(fgets(input, MAX_INPUT_SIZE, stdin)) {
+        
+        if (strcmp(input, "exit\n") == 0 || strcmp(input, "^D") == 0) {
             printf("Exiting...\n");         
             exit(EXIT_SUCCESS);                             // Exit shell with code 0
         }
@@ -25,13 +30,22 @@ int main(void) {
             if (ret == 0) {
                 execl("/bin/fortune", "fortune", NULL);     // child executes fortune command
                 exit(0);                                    // Exit child process, if not done by execl
-            }   
-            int status;
+            }
             wait(&status);                                  // Wait for child process to conclude 
         }
-        else {
+        else if (strcmp(input, "\n") != 0) {
             printf("Unknown command : %s", input);
+        }   
+
+        if (status != -1) {
+            printf("enseash [exit:%d] %% ", status);
+            status = -1;                                    // Reset status after displaying it
         }
+        else {printf("enseash %% ");}
+        fflush(stdout);
     }
 }
+
+
+
 
