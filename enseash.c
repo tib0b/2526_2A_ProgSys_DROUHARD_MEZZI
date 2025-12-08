@@ -20,9 +20,9 @@ int main(void) {
     fflush(stdout);
 
     while(fgets(input, MAX_INPUT_SIZE, stdin)) {
-        
-        if (strcmp(input, "exit\n") == 0 || strcmp(input, "^D") == 0) {
-            printf("Exiting...\n");         
+
+        if (strcmp(input, "exit\n") == 0) {
+            printf("Exiting...\n");  
             exit(EXIT_SUCCESS);                             // Exit shell with code 0
         }
         else if (strcmp(input, "fortune\n") == 0) {
@@ -44,6 +44,8 @@ int main(void) {
         else {printf("enseash %% ");}
         fflush(stdout);
     }
+    printf("\nExiting...\n");
+    exit(EXIT_SUCCESS);                                   // Exit shell with code 0, when ^D is pressed
 }
 
 
