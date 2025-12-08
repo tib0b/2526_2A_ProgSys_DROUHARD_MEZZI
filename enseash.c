@@ -16,7 +16,11 @@ int main(void) {
         printf("enseash %% ");
         fflush(stdout);
         fgets(input, 20, stdin);
-        if (strcmp(input, "fortune\n") == 0) {
+        if (strcmp(input, "exit\n") == 0) {
+            printf("Exiting...\n");         
+            exit(EXIT_SUCCESS);                             // Exit shell with code 0
+        }
+        else if (strcmp(input, "fortune\n") == 0) {
             int ret = fork();                               // Create a child process
             if (ret == 0) {
                 execl("/bin/fortune", "fortune", NULL);     // child executes fortune command
