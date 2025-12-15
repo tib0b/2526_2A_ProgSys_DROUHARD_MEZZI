@@ -84,15 +84,34 @@ int printnextprompt(int status, uint64_t delta_us)
     return status + 1;
 }
 
+int addargsfromfile(FILE *file, char *args[], int i)
+{
+    char line[MAX_INPUT_SIZE];
+
+    while (fgets(line, sizeof(line), file) != NULL && i < MAX_ARG_COUNT)
+    {
+        line[strcspn(line, "\n")] = 0; // Remove trailing newline character
+        args[i++] = strdup(line);       // Add argument from file
+    }
+
+    if (strtok(NULL, " ") != NULL)
+    {
+        printf("Warning: Maximum argument count exceeded. Extra arguments ignored.\n");
+    }
+
+    return i;
+}
+
 int formatinput(char *input, char *args[], char **outfile, int i)
 {
 
-    input[strcspn(input, "\n")] = 0;            // Remove trailing newline character
+    input[strcspn(input, "\n")] = 0; // Remove trailing newline character
 
     for (char *p = strtok(input, " "); p != NULL && i < MAX_ARG_COUNT; p = strtok(NULL, " "))
     {
         args[i++] = p; // Extract arguments
     }
+
     if (strtok(NULL, " ") != NULL)
     {
         printf("Warning: Maximum argument count exceeded. Extra arguments ignored.\n");
@@ -103,6 +122,12 @@ int formatinput(char *input, char *args[], char **outfile, int i)
         *outfile = args[i - 1];
         i -= 2;
     }
+
+    else if ((i > 1) && (strcmp(args[i - 2], "<") == 0))
+    {
+        i = addargsfromfile(fopen(args[i - 1], "r"), args, i - 2);
+    }
+
     return i;
 }
 
@@ -117,14 +142,13 @@ int main(void)
 
     while (fgets(input, MAX_INPUT_SIZE, stdin))
     {
-
         char *args[MAX_ARG_COUNT + 1]; // Tokenize input to get command
-        int i = 0;
-        char *outfile = NULL; // Output file for redirection
+        int i = 0;                     // Argument counter
+        char *outfile = NULL;          // Output file for redirection
 
-        i = formatinput(input, args, &outfile, i);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start);     // Start timer
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &start); // Start timer
+        i = formatinput(input, args, &outfile, i);      // Format input to extract arguments and handle redirection, returns argument count
 
         status = readcommand(i, args, outfile); // Process command, return status, should be 0 for success, 1 for failure and -1 for no command
 
