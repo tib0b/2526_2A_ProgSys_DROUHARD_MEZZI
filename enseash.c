@@ -188,11 +188,11 @@ int formatinput(char *input, char *args[], char **outfile, int status)
             {
                 args2[k - j - 1] = args[k];
             }
-            status = execute_pipe(args1, args2, j, i - j - 1);
+            status = execute_pipe(args1, args2, j, i - j - 1);  // Execute piped commands, works for two commands only
             return status;
         }
-        status = readcommand(i, args, *outfile); // Process command, return status, should be 0 for success, 1 for failure and -1 for no command
     }
+    status = readcommand(i, args, *outfile); // Process command, return status, should be 0 for success, 1 for failure and -1 for no command
     return status;
 }
 
