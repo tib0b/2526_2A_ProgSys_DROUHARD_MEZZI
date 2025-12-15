@@ -15,7 +15,7 @@
 
 struct timespec start, end;
 
-int execfortune(int i, char *args[], char *outfile)
+int execvcommand(int i, char *args[], char *outfile, char *command)
 {
     int ret = fork();
     if (ret < 0) // fork failed
@@ -38,7 +38,7 @@ int execfortune(int i, char *args[], char *outfile)
         }
 
         args[i] = NULL;
-        execv("/bin/fortune", args);
+        execv(command, args);
     }
 
     int status;
@@ -58,7 +58,17 @@ int readcommand(int i, char *args[], char *outfile)
 
     else if (strcmp(args[0], "fortune") == 0)
     {
-        status = execfortune(i, args, outfile);
+        status = execvcommand(i, args, outfile, "/bin/fortune");
+    }
+
+    else if (strcmp(args[0], "ls") == 0)
+    {
+        status = execvcommand(i, args, outfile, "/bin/ls");
+    }
+
+    else if (strcmp(args[0], "wc") == 0)
+    {
+        status = execvcommand(i, args, outfile, "/bin/wc");
     }
 
     else if (strcmp(args[0], "\n") != 0)
@@ -91,7 +101,7 @@ int addargsfromfile(FILE *file, char *args[], int i)
     while (fgets(line, sizeof(line), file) != NULL && i < MAX_ARG_COUNT)
     {
         line[strcspn(line, "\n")] = 0; // Remove trailing newline character
-        args[i++] = strdup(line);       // Add argument from file
+        args[i++] = strdup(line);      // Add argument from file
     }
 
     if (strtok(NULL, " ") != NULL)
@@ -102,9 +112,45 @@ int addargsfromfile(FILE *file, char *args[], int i)
     return i;
 }
 
-int formatinput(char *input, char *args[], char **outfile, int i)
+int execute_pipe(char *cmd1[], char *cmd2[], int j, int k)
 {
+    int fd[2];
+    pipe(fd);
+    int status1 = 0;
+    int status2 = 0;
 
+    if (fork() == 0)
+    {
+        int status1;
+        // First child: left command
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[0]);
+        close(fd[1]);
+        status1 = readcommand(j, cmd1, NULL);
+        //perror("execvp");
+        exit(status1);
+    }
+    if (fork() == 0)
+    {
+        int status2;
+        // Second child: right command
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[1]);
+        close(fd[0]);
+        status2 = readcommand(k, cmd2, NULL);
+        //perror("execvp");
+        exit(status2);
+    }
+    close(fd[0]);
+    close(fd[1]);
+    status1 = wait(NULL);
+    status2 = wait(NULL);
+    return status1 || status2;
+}
+
+int formatinput(char *input, char *args[], char **outfile, int status)
+{
+    int i = 0;                       // Argument counter
     input[strcspn(input, "\n")] = 0; // Remove trailing newline character
 
     for (char *p = strtok(input, " "); p != NULL && i < MAX_ARG_COUNT; p = strtok(NULL, " "))
@@ -128,7 +174,26 @@ int formatinput(char *input, char *args[], char **outfile, int i)
         i = addargsfromfile(fopen(args[i - 1], "r"), args, i - 2);
     }
 
-    return i;
+    for (int j = 0; j < i; j++)
+    {
+        if (strcmp(args[j], "|") == 0)
+        {
+            char *args1[MAX_ARG_COUNT + 1];
+            char *args2[MAX_ARG_COUNT + 1];
+            for (int k = 0; k < j; k++)
+            {
+                args1[k] = args[k];
+            }
+            for (int k = j + 1; k < i; k++)
+            {
+                args2[k - j - 1] = args[k];
+            }
+            status = execute_pipe(args1, args2, j, i - j - 1);
+            return status;
+        }
+        status = readcommand(i, args, *outfile); // Process command, return status, should be 0 for success, 1 for failure and -1 for no command
+    }
+    return status;
 }
 
 int main(void)
@@ -143,14 +208,12 @@ int main(void)
     while (fgets(input, MAX_INPUT_SIZE, stdin))
     {
         char *args[MAX_ARG_COUNT + 1]; // Tokenize input to get command
-        int i = 0;                     // Argument counter
-        char *outfile = NULL;          // Output file for redirection
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &start);     // Start timer
+        char *outfile = NULL; // Output file for redirection
 
-        i = formatinput(input, args, &outfile, i);      // Format input to extract arguments and handle redirection, returns argument count
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start); // Start timer
 
-        status = readcommand(i, args, outfile); // Process command, return status, should be 0 for success, 1 for failure and -1 for no command
+        status = formatinput(input, args, &outfile, status); // Format input to extract arguments and handle redirection, returns argument count
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &end);
         uint64_t delta_us = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000; // Calculate elapsed time in milliseconds
